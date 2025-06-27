@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>経営課題ヒヤリングチャットボット (CSV出力)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px; /* 全体的なパディング */
+        }
+        .chat-container {
+            max-width: 800px;
+            width: 100%; /* 幅を調整 */
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 40px); /* 画面の高さに合わせる */
+            min-height: 500px; /* 最小高さを設定 */
+        }
+        @media (max-width: 768px) {
+            .chat-container {
+                height: 95vh; /* スマホではもう少し高さを抑える */
+                margin: 10px auto;
+            }
+        }
+        .messages {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+        }
+        .message {
+            display: flex;
+            margin-bottom: 20px;
+            animation: fadeInUp 0.3s ease-out;
+        }
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .message.user {
+            justify-content: flex-end;
+        }
+        .message.bot {
+            justify-content: flex-start;
+        }
+        .message-bubble {
+            padding: 16px 20px;
+            border-radius: 24px;
+            max-width: 85%;
+            word-wrap: break-word;
+            position: relative;
+        }
+        .message.user .message-bubble {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 6px;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        .message.bot .message-bubble {
+            background-color: #ffffff;
+            color: #2d3748;
+            border: 1px solid #e2e8f0;
+            border-bottom-left-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+        .input-area {
+            padding: 20px;
+            background-color: #ffffff;
+            border-top: 1px solid #e2e8f0;
+        }
+        .input-area input {
+            flex-grow: 1;
+            border: 2px solid #e2e8f0;
+            border-radius: 30px;
+            padding: 12px 20px;
+            outline: none;
+            transition: all 0.3s ease;
+            font-size: 16px;
+        }
+        .input-area input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .input-area button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+        .input-area button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .progress-bar {
+            height: 4px;
+            background-color: #e2e8f0;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s ease;
+        }
+        .category-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+        .quick-reply {
+            display: inline-block;
+            background-color: #f7fafc;
+            border: 1px solid #e2e8f0;
+            padding: 8px 16px;
+            border-radius: 20px;
+            margin: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+        }
+        .quick-reply:hover {
+            background-color: #667eea;
+            color: white;
+            transform: translateY(-1px);
+        }
+        .download-button {
+            background: linear-gradient(45deg, #4CAF50 0%, #689F38 100%);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(0, 128, 0, 0.3);
+            transition: all 0.3s ease;
+            margin-top: 20px;
+            display: inline-block; /*中央寄せのために必要*/
+        }
+        .download-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 7px 20px rgba(0, 128, 0, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <header class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold">経営課題ヒヤリングチャットボット</h1>
+                <p class="text-blue-100 text-sm mt-1">経営課題の把握と解決策提案のためのヒヤリング</p>
+            </div>
+            <div class="text-right text-sm">
+                <div id="progress-text">準備中</div>
+            </div>
+        </header>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+        </div>
+        <div class="messages" id="messages">
+            <div class="message bot">
+                <div class="message-bubble">
+                    <div class="category-badge">基本情報</div>
+                    こんにちは！経営課題ヒヤリングチャットボットです。<br>
+                    貴社の経営課題を把握し、適切な解決策をご提案するためのヒヤリングを行います。<br><br>
+                    まず、基本情報から始めさせていただきます。<br>
+                    <strong>企業名</strong>を教えてください。
+                </div>
+            </div>
+        </div>
+        <form class="input-area flex gap-4" id="chat-form">
+            <input type="text" id="user-input" placeholder="企業名を入力してください..." class="flex-grow">
+            <button type="submit">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+            </button>
+        </form>
+    </div>
+
+    <script>
+        // ヒヤリング項目の定義
+        const hearingItems = [
+            // 基本情報
+            { category: '基本情報', key: 'companyName', question: '企業名を教えてください。', type: 'text', placeholder: '企業名を入力してください...' },
+            { category: '基本情報', key: 'intervieweeName', question: 'インタビュー対象者のお名前を教えてください。', type: 'text', placeholder: 'お名前を入力してください...' },
+            { category: '基本情報', key: 'position', question: 'ご役職を教えてください。', type: 'text', placeholder: 'ご役職を入力してください...' },
+            
+            // 事業概要
+            { category: '事業概要', key: 'mainBusiness', question: '貴社の主要事業と提供している製品・サービスについて簡単にご説明ください。', type: 'text', placeholder: '主要事業・製品・サービスについて入力してください...' },
+            { category: '事業概要', key: 'strengths', question: '貴社の強みや競合他社と比較した際の差別化要因は何だとお考えですか？', type: 'text', placeholder: '強みや差別化要因を入力してください...' },
+            { category: '事業概要', key: 'businessEnvironment', question: '現在の事業環境（市場動向、競合状況など）をどのように捉えていますか？', type: 'text', placeholder: '事業環境について入力してください...' },
+            
+            // 経営目標と現状
+            { category: '経営目標と現状', key: 'vision', question: '貴社の中長期的な経営ビジョンや目標をお聞かせください。', type: 'text', placeholder: '経営ビジョンや目標を入力してください...' },
+            { category: '経営目標と現状', key: 'progress', question: 'その目標に対する現在の進捗状況はいかがでしょうか？', type: 'text', placeholder: '進捗状況を入力してください...' },
+            { category: '経営目標と現状', key: 'initiatives', question: '目標達成に向けて、現在取り組んでいる主な施策があればご説明ください。', type: 'text', placeholder: '主な施策について入力してください...' },
+            
+            // 経営課題の特定
+            { category: '経営課題の特定', key: 'mainChallenges', question: '現在、経営上で最も重要だと考えている課題は何ですか？（複数回答可）', type: 'multiple', options: ['人材育成・採用', '売上拡大', '利益改善', '組織体制', '事業承継', '新規事業開発', 'デジタル化・IT活用', 'その他'], placeholder: '課題を選択または入力してください...' },
+            { category: '経営課題の特定', key: 'challengeBackground', question: 'その課題が生じている背景や原因について、どのようにお考えですか？', type: 'text', placeholder: '課題の背景や原因を入力してください...' },
+            { category: '経営課題の特定', key: 'pastEfforts', question: '課題解決に向けて、これまでどのような取り組みを行ってきましたか？また、その結果はいかがでしたか？', type: 'text', placeholder: '過去の取り組みとその結果を入力してください...' },
+            { category: '経営課題の特定', key: 'longTermChallenges', question: '上記の課題以外に、中長期的に取り組むべき課題があればお聞かせください。', type: 'text', placeholder: '中長期的な課題を入力してください...' },
+            
+            // 組織・人材
+            { category: '組織・人材', key: 'organizationChallenges', question: '現在の組織体制や人材配置について、課題だと感じている点はありますか？', type: 'text', placeholder: '組織や人材配置の課題を入力してください...' },
+            { category: '組織・人材', key: 'hrInitiatives', question: '人材育成や組織活性化に向けて、どのような取り組みを行っていますか？', type: 'text', placeholder: '人材育成や組織活性化の取り組みを入力してください...' },
+            
+            // 財務・業績
+            { category: '財務・業績', key: 'performance', question: '直近の業績動向（売上高、利益率など）についてお聞かせください。', type: 'text', placeholder: '業績動向を入力してください...' },
+            { category: '財務・業績', key: 'financialFocus', question: '財務面で特に注力している指標や改善したい点はありますか？', type: 'text', placeholder: '財務の注力点や改善点を入力してください...' },
+            
+            // イノベーションと成長
+            { category: 'イノベーションと成長', key: 'newBusiness', question: '新規事業開発や既存事業の拡大に向けた取り組みについて教えてください。', type: 'text', placeholder: '新規事業や拡大の取り組みを入力してください...' },
+            { category: 'イノベーションと成長', key: 'digitalization', question: 'デジタル化やIT活用について、現状と今後の方針をお聞かせください。', type: 'text', placeholder: 'デジタル化・IT活用について入力してください...' },
+            
+            // 外部環境への対応
+            { category: '外部環境への対応', key: 'externalResponse', question: '貴社の事業に影響を与える可能性のある外部環境の変化（法規制、技術革新など）にどのように対応していますか？', type: 'text', placeholder: '外部環境への対応を入力してください...' },
+            { category: '外部環境への対応', key: 'socialResponsibility', question: 'SDGsやESGなど、社会的責任に関する取り組みについてお聞かせください。', type: 'text', placeholder: '社会的責任に関する取り組みを入力してください...' },
+            
+            // 優先順位と解決への期待
+            { category: '優先順位と解決への期待', key: 'topPriorities', question: 'これまでお聞きした課題の中で、最優先で取り組むべきだとお考えの課題を3つ挙げてください。', type: 'text', placeholder: '最優先課題を3つ入力してください（例: 売上拡大、人材育成、IT化）' },
+            { category: '優先順位と解決への期待', key: 'supportExpectations', question: 'それらの課題解決に向けて、どのようなサポートや解決策を期待されていますか？', type: 'text', placeholder: '期待するサポートや解決策を入力してください...' },
+            
+            // 追加情報
+            { category: '追加情報', key: 'additionalInfo', question: '本日お聞きした内容以外に、経営課題に関連して共有しておきたい情報がありましたらお聞かせください。', type: 'text', placeholder: '追加情報があれば入力してください...' },
+            { category: '追加情報', key: 'nextSteps', question: '今後の課題解決に向けたプロセスや、次のステップについてのご要望はありますか？', type: 'text', placeholder: '次のステップについてのご要望を入力してください...' }
+        ];
+
+        // 状態管理
+        let currentQuestionIndex = 0;
+        let hearingData = {}; // 収集したデータを保存
+        
+        // DOM要素の取得
+        const chatForm = document.getElementById('chat-form');
+        const userInput = document.getElementById('user-input');
+        const messagesContainer = document.getElementById('messages');
+        const progressFill = document.getElementById('progress-fill');
+        const progressText = document.getElementById('progress-text');
+        
+        // 進捗バーとテキストの更新
+        function updateProgress() {
+            const progress = ((currentQuestionIndex) / hearingItems.length) * 100;
+            progressFill.style.width = progress + '%';
+            progressText.textContent = `${currentQuestionIndex}/${hearingItems.length} 完了`;
+        }
+
+        // メッセージをチャット履歴に追加する関数
+        function addMessage(text, sender, options = null) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', sender);
+            
+            let content = `<div class="message-bubble">`;
+            
+            if (sender === 'bot' && currentQuestionIndex < hearingItems.length) {
+                const currentItem = hearingItems[currentQuestionIndex];
+                // 完了メッセージの後に新しいカテゴリバッジを表示しない
+                if (!text.includes('ヒヤリングが完了しました！') && !text.includes('CSVファイルをダウンロード')) {
+                    content += `<div class="category-badge">${currentItem.category}</div>`;
+                }
+            }
+            
+            content += text;
+            
+            if (options && options.length > 0) {
+                content += '<div style="margin-top: 12px;">';
+                options.forEach(option => {
+                    content += `<span class="quick-reply" onclick="selectOption('${option}')">${option}</span>`;
+                });
+                content += '</div>';
+            }
+            
+            content += '</div>';
+            messageDiv.innerHTML = content;
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // 選択肢選択（「主要課題」のような複数選択用）
+        window.selectOption = function(option) { // グローバルに公開
+            const currentItem = hearingItems[currentQuestionIndex];
+            if (currentItem.key === 'mainChallenges') {
+                if (!hearingData[currentItem.key]) {
+                    hearingData[currentItem.key] = [];
+                }
+                if (!hearingData[currentItem.key].includes(option)) {
+                    hearingData[currentItem.key].push(option);
+                    addMessage(option, 'user');
+                    
+                    setTimeout(() => {
+                        const remainingOptions = currentItem.options.filter(opt => !(hearingData[currentItem.key] || []).includes(opt));
+                        if (remainingOptions.length > 0 && hearingData[currentItem.key].length < 3) { // 最大3つまで選択可能とする
+                            addMessage('他にもありますか？「完了」と入力すると次の質問に進みます。', 'bot', remainingOptions);
+                        } else {
+                            addMessage('課題の選択を完了しました。', 'bot');
+                            setTimeout(() => nextQuestion(), 500);
+                        }
+                    }, 500);
+                } else {
+                    addMessage('それは既に選択済みです。', 'bot');
+                }
+            } else {
+                userInput.value = option;
+                handleUserInput(option); // 通常の入力として処理
+            }
+        }
+
+        // ユーザー入力処理
+        function handleUserInput(message) {
+            if (currentQuestionIndex >= hearingItems.length) {
+                addMessage('ヒヤリングは完了しました。ありがとうございました！', 'bot');
+                return;
+            }
+
+            const currentItem = hearingItems[currentQuestionIndex];
+            
+            if (currentItem.key === 'mainChallenges') {
+                if (message.toLowerCase() === '完了') {
+                    if (!hearingData[currentItem.key] || hearingData[currentItem.key].length === 0) {
+                        addMessage('課題を一つ以上選択してください。', 'bot', currentItem.options);
+                        return;
+                    }
+                    nextQuestion(); // 選択完了で次の質問へ
+                    return;
+                } else {
+                    // Quick Replyではない手動入力の場合も、選択肢として追加を試みる
+                    if (!hearingData[currentItem.key]) {
+                        hearingData[currentItem.key] = [];
+                    }
+                    if (!hearingData[currentItem.key].includes(message)) {
+                        hearingData[currentItem.key].push(message);
+                        addMessage('「'+message+'」を追加しました。他にもありますか？「完了」と入力すると次の質問に進みます。', 'bot', currentItem.options);
+                    } else {
+                        addMessage('それは既に選択済みです。', 'bot');
+                    }
+                    return; // 複数選択の場合は、ここで処理を終え、次の質問に進まない
+                }
+            } else {
+                hearingData[currentItem.key] = message;
+            }
+
+            nextQuestion();
+        }
+
+        // 次の質問へ
+        function nextQuestion() {
+            currentQuestionIndex++;
+            updateProgress();
+
+            if (currentQuestionIndex >= hearingItems.length) {
+                // ヒヤリング完了
+                addMessage('ヒヤリングが完了しました！ありがとうございました。', 'bot');
+                addMessage('収集したデータを基に、CSVファイルをダウンロードできます。', 'bot');
+                
+                // CSVダウンロードボタンの表示
+                setTimeout(() => {
+                    const downloadButtonHtml = `
+                        <div class="message bot">
+                            <div class="message-bubble flex flex-col items-center">
+                                <button id="download-csv-button" class="download-button">
+                                    CSVデータをダウンロード
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    messagesContainer.insertAdjacentHTML('beforeend', downloadButtonHtml);
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight; // スクロール
+                    
+                    document.getElementById('download-csv-button').addEventListener('click', downloadCsv);
+                }, 1000);
+                
+                userInput.disabled = true; // 入力欄を無効化
+                chatForm.querySelector('button[type="submit"]').disabled = true; // 送信ボタンも無効化
+                return;
+            }
+
+            const nextItem = hearingItems[currentQuestionIndex];
+            userInput.placeholder = nextItem.placeholder || 'ご回答を入力してください...';
+            userInput.value = ''; // 入力欄をクリア
+
+            setTimeout(() => {
+                if (nextItem.type === 'multiple') {
+                    addMessage(nextItem.question, 'bot', nextItem.options);
+                } else {
+                    addMessage(nextItem.question, 'bot');
+                }
+            }, 500);
+        }
+
+        // データをCSV形式でダウンロードする関数
+        function downloadCsv() {
+            // CSVヘッダー（スプレッドシートの列順に合わせる）
+            const csvHeaders = [
+                '日付', '時刻', '企業名', 'インタビュー対象者名', '役職', '主要事業', '強み', 
+                '事業環境', '経営ビジョン', '進捗状況', '主な施策', '主要課題 (複数)', 
+                '課題の背景', '過去の取り組み', '中長期課題', '組織課題', '人材施策', 
+                '業績動向', '財務注力点', '新規事業', 'デジタル化', '外部環境対応', 
+                '社会的責任', '最優先課題3つ', '期待するサポート', '追加情報', '次のステップ'
+            ];
+
+            // データの整形
+            const now = new Date();
+            const formattedDate = now.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/'); // YYYY/MM/DD
+            const formattedTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' }); // HH:MM:SS
+
+            const dataRow = [
+                formattedDate,
+                formattedTime,
+                hearingData.companyName || '',
+                hearingData.intervieweeName || '',
+                hearingData.position || '',
+                hearingData.mainBusiness || '',
+                hearingData.strengths || '',
+                hearingData.businessEnvironment || '',
+                hearingData.vision || '',
+                hearingData.progress || '',
+                hearingData.initiatives || '',
+                (Array.isArray(hearingData.mainChallenges) ? hearingData.mainChallenges.join(', ') : hearingData.mainChallenges || ''), // 配列はカンマ区切りで結合
+                hearingData.challengeBackground || '',
+                hearingData.pastEfforts || '',
+                hearingData.longTermChallenges || '',
+                hearingData.organizationChallenges || '',
+                hearingData.hrInitiatives || '',
+                hearingData.performance || '',
+                hearingData.financialFocus || '',
+                hearingData.newBusiness || '',
+                hearingData.digitalization || '',
+                hearingData.externalResponse || '',
+                hearingData.socialResponsibility || '',
+                hearingData.topPriorities || '',
+                hearingData.supportExpectations || '',
+                hearingData.additionalInfo || '',
+                hearingData.nextSteps || ''
+            ];
+
+            // CSV文字列の生成
+            // 各セル内のダブルクォートをエスケープし、カンマが含まれる場合はダブルクォートで囲む
+            const escapeCsv = (value) => {
+                if (value === null || value === undefined) return '';
+                let stringValue = String(value);
+                if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n') || stringValue.includes('\r')) {
+                    return '"' + stringValue.replace(/"/g, '""') + '"';
+                }
+                return stringValue;
+            };
+
+            const csvContent = 
+                csvHeaders.map(escapeCsv).join(',') + '\n' + 
+                dataRow.map(escapeCsv).join(',');
+
+            // BOM付きUTF-8エンコーディング (Excelで文字化けしないように)
+            const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+            const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
+            
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `経営課題ヒヤリング_${formattedDate.replace(/\//g, '')}.csv`; // ファイル名
+            document.body.appendChild(a); // DOMに追加しないとFirefoxで動作しない場合がある
+            a.click();
+            document.body.removeChild(a); // リンク要素を削除
+            URL.revokeObjectURL(url); // URLを解放
+
+            addMessage('CSVファイルのダウンロードが開始されました。', 'bot');
+        }
+
+        // フォーム送信時のイベントリスナー
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const userMessage = userInput.value.trim();
+            if (!userMessage) return;
+
+            addMessage(userMessage, 'ユーザー');
+            userInput.value = ''; // 入力欄をクリア
+
+            setTimeout(() => {
+                handleUserInput(userMessage);
+            }, 300);
+        });
+
+        // 初期化時に進捗バーを更新
+        updateProgress();
+    </script>
+</body>
+</html>
